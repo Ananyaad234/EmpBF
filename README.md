@@ -46,3 +46,49 @@ predict dbagdp_resid, residuals
 regress gdpgrowth_1995_2017 dbagdp_resid // two-step procedure
 
 reg gdpgrowth dbagdp stmktcap, beta // comparing β1 and β2 
+
+-----------------------------------------------------------------------------------
+
+# 2: Instrumental Variables, This exercise follows [Levine et al., 2000] using an instrumental variable based on [Porta et al., 1998]
+to study the relationship between finance and growth. Uses national legal origin ([Porta et al., 1998]) of a country as an instrument for
+its financial development.
+
+ssc install catplot
+ssc install ivreg2
+ssc install ranktest
+
+* 1: legal origin Instrument (legor)
+
+catplot, over(legor) ///
+ ytitle("Frequency") title("Frequency of Legal Origins") // Freq plot
+graph bar (mean) credit_t_gdp_1960, over(legor) ///
+ ytitle("Mean Credit-to-GDP (1960)") ///
+ title("Average Credit-to-GDP by Legal Origin") 
+tabstat credit_t_gdp_1960, by(legor) // calculates mean value of credit to gdp for each level of legor
+ 
+* 2: regression 1
+reg gdpgrowth_1960_1980 credit_t_gdp_1960
+reg gdpgrowth_1960_1995 credit_t_gdp_1960
+reg gdpgrowth_1960_2020 credit_t_gdp_1960 // runs the regressions
+
+ivreg2 gdpgrowth_1960_1980 (credit_t_gdp_1960 = legor_fr), robust
+ivreg2 gdpgrowth_1960_1995 (credit_t_gdp_1960 = legor_fr), robust
+ivreg2 gdpgrowth_1960_2020 (credit_t_gdp_1960 = legor_fr), robust // Two-Stage-Least-Squares
+
+* 3: IV with controls and interactions
+ivreg2 gdpgrowth_1960_1995 (credit_t_gdp_1960 = legor_fr) pop_1960, robust // includes an exogenous control variable
+
+reg credit_t_gdp_1960 legor_uk legor_fr legor_so legor_ge pop_1960, robust 
+test (legor_uk=0) (legor_fr=0) (legor_so=0) (legor_ge=0) // Regress credit_t_gdp_1960 on the four legal origin dummies
+
+reg gdpgrowth_1960_1995 c.credit_t_gdp_1960##c.pop_1960, robust // includes population interaction term
+
+ivreg2 gdpgrowth_1960_1995 (c.credit_t_gdp_1960 c.credit_t_gdp_1960#c.pop_1960 = i.legor_fr c.legor_fr#c.pop_1960) c.pop_1960, robust // Two-Stage-Least-Squares with French Legal Origin as instrument for credit to GDP (1960)
+
+
+* 4: IV with several instruments
+
+ivreg2 gdpgrowth_1960_1995 (credit_t_gdp_1960 = legor_uk legor_fr legor_so legor_ge), robust // Two-Stage-Least-Squares using all 4 Legors as instrument for credit to GDP (1960)
+reg credit_t_gdp_1960 legor_uk legor_fr legor_so legor_ge, robust
+test (legor_uk=0) (legor_fr=0) (legor_so=0) (legor_ge=0) 
+ivreg2 gdpgrowth_1960_1995 (credit_t_gdp_1960 = legor_uk legor_fr legor_so legor_ge), robust // For testing whether the instruments are valid
